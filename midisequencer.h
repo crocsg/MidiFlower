@@ -9,7 +9,8 @@
 class CMidiSequencer
 {
 public:
-    CMidiSequencer (uint32_t size_t);
+    CMidiSequencer (uint32_t size);
+    
     void Play (uint32_t time, MIDImessage* midi);
 
     void Control (uint32_t time);
