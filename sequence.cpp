@@ -1,13 +1,41 @@
+/*
+ MIT License
+
+Copyright (c) 2022 S Godin (Climate Change Lab)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+This project is based on https://github.com/electricityforprogress/MIDIsprout great
+work about biodata sonification
+*/
+
 #include "sequence.h"
 
 
-CSequence::CSequence (size_t size, size_t block_size, uint32_t tempo, uint32_t noteratio, uint8_t* melody, size_t melodysize)
+CSequence::CSequence (size_t size, uint32_t tempo, uint32_t noteratio, uint8_t* melody, size_t melodysize)
 {
-    m_size = block_size;
+    
     m_tempo = tempo;
     m_seq.resize (size);
-    m_mode = CSequence::Learn;
     m_noteratio = noteratio;
+   
     if (melody != NULL)
     {
       m_melody.resize (melodysize);
@@ -33,10 +61,10 @@ void CSequence::addNote (uint32_t time, uint8_t value, uint8_t velocity, uint16_
     if (m_seq[pos].velocity == 0)
         m_cntnote++;
     m_seq[pos] = mes;
-    Serial.printf("addNote pos=%d, size=%d, ch=%d, nbnote=%d\n", pos, m_seq.size(), notechannel, m_cntnote);
+    Serial.printf("addNote time =%lu pos=%d, size=%d, ch=%d, nbnote=%d tempo=%ld\n", time, pos, m_seq.size(), notechannel, m_cntnote, m_tempo);
     
     // delete a note if sequence is full
-    if (m_cntnote > (m_seq.size() * 100) / m_noteratio)
+    if (m_cntnote > (m_seq.size() * m_noteratio ) / 100)
     {
         for (auto it = m_seq.begin () + pos + 1; it != m_seq.end (); it++)
         {
@@ -55,13 +83,11 @@ uint8_t CSequence::play (uint32_t time, MIDImessage* mes)
         return (0);
 
     m_lastplay = time;    
-    if (m_mode == CSequence::Learn || m_melody.size () == 0)
-        return play_learn (time, mes);
-    else
-        return play_seq(time, mes);    
+    return play_seq (time, mes);
+    
 }
 
-uint8_t CSequence::play_learn (uint32_t time, MIDImessage* mes)
+uint8_t CSequence::play_seq (uint32_t time, MIDImessage* mes)
 {
     size_t pos = (time / m_tempo) % m_seq.size ();
     
@@ -74,19 +100,18 @@ uint8_t CSequence::play_learn (uint32_t time, MIDImessage* mes)
     return (0);
 }
 
-uint8_t CSequence::play_seq (uint32_t time, MIDImessage* mes)
+void CSequence::clear (void)
 {
-    size_t pos = (time / m_tempo) % (m_melody.size () * m_size);
-    size_t pmelody = pos / m_size;
-    size_t pnote = pos % m_size;
-    MIDImessage* ptnote  = &m_seq[m_melody[pmelody] * m_size + pnote];
-
-    if (ptnote->velocity != 0)
-    {
-
-        //Serial.printf ("seq pos=%d, ch=%d, val=%d, vel=%d\n", pos, ptnote->channel, ptnote->value, ptnote->velocity);
-        *mes = *ptnote;
-        return (1);
-    }
-    return (0);
+    for (auto it = m_seq.begin () ; it != m_seq.end (); it++)
+        it->velocity = 0;
+    m_cntnote = 0;
 }
+
+void CSequence::mute (int vel)
+{
+    for (auto it = m_seq.begin () ; it != m_seq.end (); it++)
+        if (it->velocity > vel)
+            it->velocity = (it->velocity * vel) / 100;
+    
+}
+

@@ -27,21 +27,33 @@ This project is based on https://github.com/electricityforprogress/MIDIsprout gr
 work about biodata sonification
 */
 
+#include "MidiFlowerSequencer.h"
 
-#ifndef __FLOWER_SENSOR
-#define __FLOWER_SENSOR
+#define MIN_TIME_MS_BETWEEN_NOTE   (20)
 
+void CMidiFlowerSequencer::Loop(void)
+{
+    uint32_t currentMillis = millis(); // manage time
 
-
-typedef void(* flower_sensor_callback_mes) (uint32_t min, uint32_t max, uint32_t averg, uint32_t delta, float stdevi, float stdevical);
-
-void flower_sensor_init (int pin);
-void flower_sensor_set_callback (flower_sensor_callback_mes clbk);
-void flower_sensor_analyzeSample(void);
-uint8_t flower_sensor_data_available (void);
-void flower_sensor_set_analyse_short (uint8_t s);
-void flower_sensor_update_threshold (void);
-uint32_t flower_sensor_get_last_sample_time_ms (void);
-void flower_sensor_build_mes ();
-
-#endif // __FLOWER_SENSOR
+    if (currentMillis - m_sequence_time >= MIN_TIME_MS_BETWEEN_NOTE)
+    {
+        //Serial.printf ("check notenbr=%d seq=%d\n", m_ptracks[m_sequence_index]->getnbnotes(), m_sequence_index);
+        MIDImessage note;
+        m_sequence_time = currentMillis;
+        if ((m_sequence_index > 0 && m_ptracks[m_sequence_index]->getnbnotes() > m_ptracks[m_sequence_index]->size() / 8) ||
+            m_sequence_index == 0)
+        {
+            if (m_ptracks[m_sequence_index]->play(currentMillis, &note) == 1)
+            {
+                //Serial.printf ("play seq=%d milli=%lu\n", m_sequence_index, currentMillis);
+                Play(currentMillis, &note);
+            }
+        }
+        m_sequence_index = (m_sequence_index + 1) % m_ptracks.size();
+    }
+    else
+    {
+        Control(currentMillis);
+    }
+    m_previousMillis = currentMillis; // manage time
+}

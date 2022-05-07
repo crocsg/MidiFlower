@@ -35,46 +35,43 @@ work about biodata sonification
 #include "sequence.h"
 #include "flower_sensor.h"
 
-#define LED 5
 
-#define DESIRED_EVENT 6
-#define ARRAYLEN(a) ((sizeof(a)) / (sizeof(a[0])))
+#define NBNOTE_FOR_BETTER_MEASURE   15
+
+#define LED                         5     // ESP32 Onboard LED (depends on ESP32 board)
+#define FLOWER_SENSOR_PIN          12     // galvanometer input (flower sensor)
 
 
-// manage LEDs without delay() jgillick/arduino-LEDFader https://github.com/jgillick/arduino-LEDFader.git
 
-float mapfloat(float x, float in_min, float in_max, float out_min, float out_max);
-void flowersensor_measure (uint32_t min, uint32_t max, uint32_t averg, uint32_t delta, float stdevi, float stdevical);
-
-const byte interruptPin = 12; // galvanometer input
-unsigned long previousMillis = 0;
-unsigned long currentMillis = 1;
 
 // definition des tempos
+#define BPM60 ((60 * 1000) / 90)
 #define BPM90 ((60 * 1000) / 90)
 #define BPM120 ((60 * 1000) / 120)
 #define BPM160 ((60 * 1000) / 160)
 #define BPM BPM120
 
 // nombre maxi de notes midi simultanees dans le sequencer
-#define MAX_MIDI_NOTES 64
+// max midi notes tracked in sequencer
+#define MAX_MIDI_NOTES 128
 
 // sequenceur midi
+// midi sequencer
 CMidiFlowerSequencer sequencer = CMidiFlowerSequencer(MAX_MIDI_NOTES);
 
-// definition des "pistes" midi
-CSequence A = CSequence(60, 4, BPM, 40);
-CSequence B = CSequence(120, 4, BPM, 50);
-CSequence C = CSequence(120, 4, BPM / 4, 40);
-CSequence D = CSequence(120, 4, BPM, 40);
+// definition des "pistes" midi du tempo associé et du taux de remplissage max
+CSequence midi_track_1 = CSequence(60, BPM, 70);
+CSequence midi_track_2 = CSequence(120,BPM, 60);
+CSequence midi_track_3 = CSequence(120, BPM / 4, 75);
+CSequence midi_track_4 = CSequence(120, BPM, 35);
 
 
 
 static uint32_t chipId = 0;
-
 static char bleserverid[64] = "";
 
 
+void flowersensor_measure (uint32_t min, uint32_t max, uint32_t averg, uint32_t delta, float stdevi, float stdevical);
 
 // microcontroleur initialisation
 void setup()
@@ -93,16 +90,18 @@ void setup()
   // start BLE Midi server
   sprintf(bleserverid, "BioData_%08lx MIDI device", chipId); // build BLE Midi name
   BLEMidiServer.begin(bleserverid);                          // initialize bluetooth midi
-  // Serial.begin(115200);                 //initialize Serial for debug
+  
 
-  // register midi track
-  sequencer.register_track(&A);
-  sequencer.register_track(&B);
-  sequencer.register_track(&C);
-  sequencer.register_track(&D);
+  Serial.begin(115200);                 //initialize Serial for debug
+
+  // register midi track on sequencer
+  sequencer.register_track(&midi_track_1);
+  sequencer.register_track(&midi_track_2);
+  sequencer.register_track(&midi_track_3);
+  sequencer.register_track(&midi_track_4);
   
   // start flower sensor
-  flower_sensor_init(interruptPin);
+  flower_sensor_init(FLOWER_SENSOR_PIN);
   flower_sensor_set_analyse_short(1);
 
   // define a function to get measures
@@ -113,51 +112,42 @@ void setup()
 void loop()
 {
   
+
+  // good music is good rythm. You must call this very often
+  // a least one time by 10 millisec
   sequencer.Loop ();
+  
+  
   // build flower measure
   // must be called often
   flower_sensor_build_mes();
 
-  if (psequences[0]->getnbnotes() > 15)
+  // do some control stuff
+  ControlMusic ();
+
+  // if we have some music notes, change configuration for better measure
+  if (sequencer.get_track_nbnote(0) > NBNOTE_FOR_BETTER_MEASURE)
   {
     flower_sensor_set_analyse_short(0);
   }
-
-  
 }
 
-// min    valeur min
-// max    valeur max
-// averg  moyenne
+// Flower sensor measure callback. receive flower measures 
+// min    min value
+// max    max value
+// averg  average
 // delta  max - min
-// stdevi ecart-type
-// stdevical stdevi * threshold
+// stdevi standard deviation
+// stdevical standard deviation * threshold
 void flowersensor_measure (uint32_t min, uint32_t max, uint32_t averg, uint32_t delta, float stdevi, float stdevical)
 {
+    //Serial.println ("measures received \n");
 
+    // give all the measure to flower music generation code
+    BuildNoteFromMeasure (millis(), min, max, averg, delta, stdevi, stdevical);
 }
 
-void setNote(int value, int velocity, long duration, int notechannel)
-{
 
-  if (psequences[0]->getnbnotes() < psequences[0]->size() / 3)
-    psequences[0]->addNote(currentMillis, value, velocity, duration, 1);
-  else if (psequences[1]->getnbnotes() < psequences[1]->size() / 3)
-    psequences[1]->addNote(currentMillis, value, velocity, duration, 2);
-  /*else if (psequences[2]->getnbnotes() < psequences[2]->size () / 2)
-    psequences[2]->addNote (currentMillis, value, velocity, duration, 3);*/
-  else
-  {
-    uint16_t seq = currentMillis % psequences.size();
-    psequences[seq]->setmode(CSequence::playmode::Learn);
-    psequences[seq]->addNote(currentMillis, value, velocity, duration, seq + 1);
-  }
-}
 
-// provide float map function
-float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
 
-// interrupt timing sample array
+

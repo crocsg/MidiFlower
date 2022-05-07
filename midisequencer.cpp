@@ -28,6 +28,7 @@
 CMidiSequencer::CMidiSequencer (uint32_t size)
 {
     m_playingnotes.resize (size);
+    
 }
 
 void CMidiSequencer::Play (uint32_t time, MIDImessage* midi)
