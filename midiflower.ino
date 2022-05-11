@@ -45,7 +45,7 @@ work about biodata sonification
 
 
 // definition des tempos
-#define BPM60 ((60 * 1000) / 90)
+#define BPM60 ((60 * 1000) / 60)
 #define BPM90 ((60 * 1000) / 90)
 #define BPM120 ((60 * 1000) / 120)
 #define BPM160 ((60 * 1000) / 160)
