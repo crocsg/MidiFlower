@@ -9,3 +9,4 @@ If you want to build the sensor with an ESP32 board, the [documentation is avail
 
 More information about the event [Sylvestre Orchestre version de poche](https://climatechangelab.org/2021/12/13/sylvestre-orchestre-version-de-poche-retour-sur-le-hackathon-de-decembre-2021/)
 
+Your journey may continue here with web configuration [MidiFlower_wifi](https://github.com/crocsg/MidiFlower_wifi)
